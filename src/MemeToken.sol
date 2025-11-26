@@ -8,46 +8,37 @@ import "./interfaces/IUniswapV2Router02.sol";
 import "./interfaces/IUniswapV2Factory.sol";
 import "./interfaces/IUniswapV2Pair.sol";
 
-/**
- * @title SHIB 风格 Meme 代币（含税、限交易、流动性集成）
- * @dev 采用 OpenZeppelin ERC20 与 Ownable。支持：
- *  - 交易税：将税费累积在合约中，可自动进行回流（swap+add liquidity）
- *  - 流动性池：集成 UniswapV2 Router 添加/移除 LP
- *  - 交易限制：单笔最大额、每日交易次数限制
- */
+ 
 contract MemeToken is ERC20, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     // ===== 配置与状态 =====
-    uint16 public taxBps; // 税率（基点），例如 300 = 3%
-    address public taxWallet; // 税费接收地址（用于非自动回流场景）
-    mapping(address => bool) public isFeeExempt; // 免税地址
+    uint16 public taxBps;
+    address public taxWallet;
+    mapping(address => bool) public isFeeExempt;
 
-    uint256 public maxTxAmount; // 单笔交易最大额度
-    uint32 public maxDailyTxCount; // 每日最大交易次数
-    mapping(address => uint32) public dailyCount; // 地址当日交易次数
-    mapping(address => uint256) public lastReset; // 地址上次计数重置时间戳
-    mapping(address => bool) public isLimitExempt; // 交易限制豁免地址
+    uint256 public maxTxAmount;
+    uint32 public maxDailyTxCount;
+    mapping(address => uint32) public dailyCount;
+    mapping(address => uint256) public lastReset;
+    mapping(address => bool) public isLimitExempt;
 
-    bool public tradingEnabled; // 是否开放交易
+    bool public tradingEnabled;
 
-    // ===== Uniswap V2 相关 =====
     IUniswapV2Router02 public router;
     address public pair;
     address public WETH;
-    bool public swapAndLiquifyEnabled; // 自动回流开关
-    uint256 public swapThreshold; // 触发自动回流的最小代币阈值
-    bool private inSwap; // 回流中的 reentrancy 防护
+    bool public swapAndLiquifyEnabled;
+    uint256 public swapThreshold;
+    bool private inSwap;
 
-    EnumerableSet.AddressSet private liquidityPairs; // 可扩展支持多 LP
+    EnumerableSet.AddressSet private liquidityPairs;
 
-    // ===== 自定义错误 =====
     error TradingNotEnabled();
     error MaxTxExceeded(uint256 amount, uint256 max);
     error DailyTxLimitExceeded(address account, uint32 max);
     error ZeroAddress();
 
-    // ===== 事件 =====
     event SetTax(uint16 bps);
     event SetTaxWallet(address wallet);
     event SetMaxTxAmount(uint256 amount);
@@ -80,13 +71,11 @@ contract MemeToken is ERC20, Ownable {
         taxBps = taxBps_;
         taxWallet = taxWallet_;
 
-        // 默认参数：单笔最大 2% 总供给；每日最多 50 笔；自动回流阈值 0.1%
-        maxTxAmount = (totalSupply_ * 2) / 100; // 2%
+        maxTxAmount = (totalSupply_ * 2) / 100;
         maxDailyTxCount = 50;
-        swapThreshold = totalSupply_ / 1000; // 0.1%
+        swapThreshold = totalSupply_ / 1000;
         swapAndLiquifyEnabled = true;
 
-        // 免税和限额豁免常用角色
         isFeeExempt[msg.sender] = true;
         isFeeExempt[address(this)] = true;
         isFeeExempt[router_] = true;
@@ -104,9 +93,8 @@ contract MemeToken is ERC20, Ownable {
         emit SetSwapAndLiquify(swapAndLiquifyEnabled, swapThreshold);
     }
 
-    // ===== 管理函数 =====
     function setTax(uint16 bps) external onlyOwner {
-        require(bps <= 1000, "tax too high"); // ≤10%
+        require(bps <= 1000, "tax too high");
         taxBps = bps;
         emit SetTax(bps);
     }
@@ -150,7 +138,6 @@ contract MemeToken is ERC20, Ownable {
         emit SetTradingEnabled(true);
     }
 
-    // ===== 流动性操作 =====
     function addLiquidityETH(uint256 tokenAmount, uint256 amountTokenMin, uint256 amountETHMin, uint256 deadlineSeconds)
         external
         payable
@@ -183,7 +170,6 @@ contract MemeToken is ERC20, Ownable {
         );
     }
 
-    // ===== 转账逻辑（含税与限制） =====
     function _updateDaily(address account) internal {
         if (block.timestamp >= lastReset[account] + 1 days) {
             lastReset[account] = block.timestamp;
@@ -230,7 +216,6 @@ contract MemeToken is ERC20, Ownable {
 
             super._update(from, to, sendAmount);
         } else {
-            // mint 或 burn 直接执行
             super._update(from, to, value);
         }
     }
@@ -274,12 +259,10 @@ contract MemeToken is ERC20, Ownable {
         );
     }
 
-    // 手动提取合约中累积的代币税到税钱包（用于关闭自动回流场景）
     function withdrawTaxTokens(uint256 amount) external onlyOwner {
         _transfer(address(this), taxWallet, amount);
     }
 
-    // 手动提取合约中的 ETH 到税钱包
     function withdrawETH(uint256 amount) external onlyOwner {
         (bool ok, ) = taxWallet.call{value: amount}("");
         require(ok, "ETH transfer failed");

@@ -48,13 +48,3 @@ forge script script/AddLiquidity.s.sol --rpc-url <YOUR_RPC> --broadcast \
 ```
 - 函数接口：`addLiquidityETH(tokenAmount, amountTokenMin, amountETHMin, deadlineSeconds)`，需附带 ETH。
 - 移除：`removeLiquidity(liquidity, amountTokenMin, amountETHMin, deadlineSeconds)`。
-
-## 常见问题
-- `forge` 命令不存在：请先安装 Foundry 并将其加入 PATH。
-- 交易未开放：调用 `enableTrading()`。
-- 流动性路由地址：默认 UniswapV2 主网 Router `0x7a250d...`，测试网也通用，如需其他 DEX 可替换路由地址。
-
-## 风险提示
-- 税率与限额设置需兼顾公平与合规，避免过高税率导致用户体验差。
-- 部署私钥与税钱包为敏感信息，请通过环境变量安全注入，勿硬编码。
-
